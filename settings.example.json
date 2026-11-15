@@ -1,0 +1,28 @@
+{
+  "env": {
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL": "1"
+  },
+  "autoMemoryEnabled": false,
+  "disableAllHooks": true,
+  "disableClaudeAiConnectors": true,
+  "disableRemoteControl": true,
+  "allowedMcpServers": [],
+  "permissions": {
+    "defaultMode": "default",
+    "disableBypassPermissionsMode": "disable",
+    "blockReadsOutsideWorkingDirectories": true,
+    "blockWritesOutsideWorkingDirectories": true,
+    "deny": [
+      "Bash",
+      "PowerShell",
+      "Monitor",
+      "WebFetch",
+      "WebSearch",
+      "mcp__*",
+      "Read(//**/.env)",
+      "Read(//**/.env.*)",
+      "Read(//**/.npmrc)"
+    ]
+  }
+}
