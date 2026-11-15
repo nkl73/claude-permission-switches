@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Web.Script.Serialization;
@@ -25,6 +26,7 @@ internal static class Program {
 }
 
 internal sealed class Settings {
+    private static readonly string[] ProxyVariables = { "https_proxy", "HTTPS_PROXY", "http_proxy", "HTTP_PROXY" };
     internal static string UserPath {
         get {
             var custom = Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR");
@@ -115,8 +117,12 @@ internal sealed class Settings {
     }
 
     internal string ProxyAddress() {
-        object proxy;
-        return env.TryGetValue("HTTPS_PROXY", out proxy) ? proxy as string : null;
+        foreach (var name in ProxyVariables) {
+            object value;
+            if (env.TryGetValue(name, out value) && !String.IsNullOrWhiteSpace(value as string))
+                return (string)value;
+        }
+        return null;
     }
 
     private bool NonessentialTrafficIsDisabled() {
@@ -338,13 +344,7 @@ internal sealed class MainWindow : Form {
                 row.Value.Enabled = true;
                 row.Value.State = settings.ReadState(row.Key);
             }
-            var listening = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
-                .Any(address => address.Port == 7897 && (address.Address.Equals(IPAddress.Loopback) || address.Address.Equals(IPAddress.Any)));
-            bool correctProxy = settings.ProxyAddress() == "http://127.0.0.1:7897";
-            connection.Text = !correctProxy ? "●  Code 的代理地址已变更"
-                : listening ? "●  Clash 本机端口已监听 · 127.0.0.1:7897"
-                : "●  Clash 本机端口未监听 · 127.0.0.1:7897";
-            connection.ForeColor = listening && correctProxy ? Accent : Amber;
+            CheckProxy(settings.ProxyAddress());
             CheckFirewall();
             snapshotProblem = null;
         } catch (Exception ex) {
@@ -359,6 +359,46 @@ internal sealed class MainWindow : Form {
         }
         footer.Text = snapshotProblem ?? notice;
         footer.ForeColor = snapshotProblem != null ? Amber : Muted;
+    }
+
+    private void CheckProxy(string value) {
+        connection.ForeColor = Amber;
+        if (value == null) {
+            connection.Text = "●  Code 用户配置未设置代理";
+            return;
+        }
+
+        Uri proxy;
+        if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out proxy) ||
+            (proxy.Scheme != Uri.UriSchemeHttp && proxy.Scheme != Uri.UriSchemeHttps) ||
+            String.IsNullOrEmpty(proxy.Host) || proxy.Port <= 0) {
+            connection.Text = "●  Code 用户配置中的代理地址无效";
+            return;
+        }
+
+        bool localHost = String.Equals(proxy.Host.TrimEnd('.'), "localhost", StringComparison.OrdinalIgnoreCase);
+        IPAddress ip;
+        IPAddress.TryParse(proxy.DnsSafeHost, out ip);
+        bool loopback = ip != null && IPAddress.IsLoopback(ip);
+        var host = ip != null && ip.AddressFamily == AddressFamily.InterNetworkV6 ? "[" + ip + "]" : proxy.Host;
+        var address = host + ":" + proxy.Port;
+        if (!localHost && !loopback) {
+            connection.Text = "●  已配置代理 · " + address;
+            connection.ForeColor = Muted;
+            return;
+        }
+
+        var localAddresses = localHost
+            ? new[] { IPAddress.Loopback, IPAddress.IPv6Loopback, IPAddress.Any, IPAddress.IPv6Any }
+            : new[] { ip, ip.AddressFamily == AddressFamily.InterNetwork ? IPAddress.Any : IPAddress.IPv6Any };
+        try {
+            bool listening = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
+                .Any(listener => listener.Port == proxy.Port && localAddresses.Contains(listener.Address));
+            connection.Text = "●  本机代理端口" + (listening ? "已监听" : "未监听") + " · " + address;
+            connection.ForeColor = listening ? Accent : Amber;
+        } catch (NetworkInformationException) {
+            connection.Text = "●  无法读取端口监听状态 · " + address;
+        }
     }
 
     private static object Property(object target, string name, params object[] args) {
