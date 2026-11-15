@@ -25,7 +25,8 @@
 
 - 面板显示当前用户设置。项目或组织的策略也可能影响实际权限。电脑操作需要 Claude Desktop 支持，放行开关还要求用户配置已禁用 Claude 账号连接器且 MCP 允许列表为空。示例配置包含这两个条件。 [Claude Code 权限规则](https://code.claude.com/docs/en/permissions) · [桌面版电脑操作](https://code.claude.com/docs/en/desktop#let-claude-use-your-computer)
 - Windows 原生 Code 的命令以你自己的用户权限运行。电脑操作开启后，Claude 可以看到你授权的应用里显示的内容。项目目录和凭据文件开关约束的是 Code 文件工具。 [Claude Code 命令隔离](https://code.claude.com/docs/en/sandboxing)
-- **网络状态（v0.1.0）**：面板只核对 Claude Code 的 `HTTPS_PROXY` 是否设为 `http://127.0.0.1:7897`、本机 TCP 端口 `7897` 是否在监听，以及当前网络的 Windows 防火墙是否开启且存在名为 `Claude proxy-only outbound` 的已启用出站阻止规则。`7897` 是本工具当前检查的端口，Clash 的实际端口以你的配置为准。面板不会安装防火墙规则，也不会验证监听进程、实际出口或断线时能否阻止直连。
+- **代理状态**：面板从 Claude Code 用户配置的 `env` 读取 `https_proxy`、`HTTPS_PROXY`、`http_proxy` 或 `HTTP_PROXY`，按该顺序取第一个非空值。面板显示主机和端口，省略 URL 中的凭据。对于 `localhost` 和回环 IP，面板会检查本机 TCP 端口是否在监听；其他地址只显示配置。会话级环境变量、项目配置和组织策略可能影响实际使用的代理。 [Claude Code 代理配置](https://code.claude.com/docs/en/network-config#proxy-configuration)
+- **防火墙状态**：面板检查当前网络的 Windows 防火墙是否开启，以及是否存在规则组 `Claude proxy-only outbound` 中已启用的出站阻止规则。面板不会安装防火墙规则，也不会验证监听进程、实际出口或断线时能否阻止直连。
 - 遥测开关控制可选请求。使用云端 Claude 模型时，模型仍会收到你的提示词以及完成任务所需的上下文。 [Claude Code 数据说明](https://code.claude.com/docs/en/data-usage)
 
 ## 从源码构建
